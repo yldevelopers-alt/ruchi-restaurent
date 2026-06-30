@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ruchi Restaurant — Manage Menu</title>
+<style>
+  :root{
+    --green:#0F7A5C;--green-light:#E9F6F0;--green-dark:#0B5C44;
+    --cream:#F7F8F5;--text:#13231D;--text-muted:#5C6F66;
+    --border:#D7E5DD;--white:#FFFFFF;--gold:#C9982E;
+  }
+  *{box-sizing:border-box}
+  body{font-family:'Inter',-apple-system,sans-serif;background:var(--cream);color:var(--text);margin:0;line-height:1.5}
+  .wrap{max-width:560px;margin:0 auto;padding:2rem 1.25rem 4rem}
+  h1{font-size:1.4rem;margin:0 0 .25rem}
+  .sub{color:var(--text-muted);font-size:.9rem;margin:0 0 2rem}
+  .card{background:var(--white);border:1px solid var(--border);border-radius:14px;padding:1.5rem;margin-bottom:1.25rem}
+  label{display:block;font-size:.8rem;font-weight:600;color:var(--text-muted);margin:0 0 .35rem;text-transform:uppercase;letter-spacing:.02em}
+  input,select,textarea{width:100%;padding:.65rem .75rem;border:1px solid var(--border);border-radius:8px;font-size:.95rem;font-family:inherit;margin-bottom:1rem;background:var(--cream)}
+  textarea{resize:vertical;min-height:60px}
+  button{width:100%;background:var(--green);color:#fff;border:none;padding:.8rem;border-radius:8px;font-size:.95rem;font-weight:600;cursor:pointer}
+  button:hover{background:var(--green-dark)}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  .row{display:flex;gap:.75rem}
+  .row > div{flex:1}
+  .msg{padding:.65rem .9rem;border-radius:8px;font-size:.85rem;margin-bottom:1rem;display:none}
+  .msg.show{display:block}
+  .msg.ok{background:var(--green-light);color:var(--green-dark)}
+  .msg.err{background:#FBE9E7;color:#B3261E}
+  .dish-list{display:flex;flex-direction:column;gap:.6rem}
+  .dish{display:flex;justify-content:space-between;align-items:center;padding:.6rem .8rem;background:var(--cream);border-radius:8px;font-size:.88rem}
+  .dish .meta{color:var(--text-muted);font-size:.78rem}
+  .dish button.del{width:auto;background:none;color:#B3261E;padding:.3rem .6rem;font-weight:600;font-size:.78rem}
+  .dish button.del:hover{background:#FBE9E7}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div id="loginView">
+    <h1>Manage Your Menu</h1>
+    <p class="sub">Ruchi Restaurant — owner login</p>
+    <div class="card">
+      <label>Password</label>
+      <input type="password" id="pw" placeholder="Enter your password">
+      <div id="loginMsg" class="msg err"></div>
+      <button onclick="login()">Log In</button>
+    </div>
+  </div>
+
+  <div id="adminView" class="hidden">
+    <h1>Manage Your Menu</h1>
+    <p class="sub">Changes here go live on the website immediately.</p>
+
+    <div class="card">
+      <label>Dish Name</label>
+      <input type="text" id="name" placeholder="e.g. Filter Coffee">
+      <label>Description</label>
+      <textarea id="desc" placeholder="A short, appetising description"></textarea>
+      <div class="row">
+        <div>
+          <label>Price (₹)</label>
+          <input type="number" id="price" placeholder="60">
+        </div>
+        <div>
+          <label>Category</label>
+          <select id="category">
+            <option value="breakfast">Breakfast</option>
+            <option value="main">Main Course</option>
+            <option value="rice">Rice & Biryani</option>
+            <option value="snacks">Snacks</option>
+            <option value="drinks">Drinks & Sweets</option>
+          </select>
+        </div>
+      </div>
+      <label>Photo URL (optional — leave blank to use a default)</label>
+      <input type="text" id="img" placeholder="https://...">
+      <label style="display:flex;align-items:center;gap:.5rem;text-transform:none;font-weight:500;color:var(--text)">
+        <input type="checkbox" id="veg" checked style="width:auto;margin:0"> Vegetarian
+      </label>
+      <div id="addMsg" class="msg"></div>
+      <button onclick="addDish()" id="addBtn">Add Dish to Menu</button>
+    </div>
+
+    <div class="card">
+      <label style="margin-bottom:.75rem">Current Menu (<span id="count">0</span> dishes)</label>
+      <div class="dish-list" id="dishList"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+let token = null;
+
+async function login(){
+  const pw = document.getElementById('pw').value;
+  const msg = document.getElementById('loginMsg');
+  const res = await fetch('/api/admin/login', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({password: pw})
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    msg.textContent = data.error;
+    msg.classList.add('show');
+    return;
+  }
+  token = data.token;
+  document.getElementById('loginView').classList.add('hidden');
+  document.getElementById('adminView').classList.remove('hidden');
+  loadDishes();
+}
+
+async function loadDishes(){
+  const res = await fetch('/api/dishes');
+  const dishes = await res.json();
+  document.getElementById('count').textContent = dishes.length;
+  const list = document.getElementById('dishList');
+  list.innerHTML = dishes.map(d => `
+    <div class="dish">
+      <div>
+        <strong>${d.name}</strong> — ₹${d.price}
+        <div class="meta">${d.category}${d.veg ? ' · veg' : ' · non-veg'}</div>
+      </div>
+      <button class="del" onclick="deleteDish(${d.id})">Remove</button>
+    </div>
+  `).join('');
+}
+
+async function addDish(){
+  const btn = document.getElementById('addBtn');
+  const msg = document.getElementById('addMsg');
+  const name = document.getElementById('name').value.trim();
+  const price = document.getElementById('price').value;
+
+  if (!name || !price) {
+    msg.textContent = 'Name and price are required.';
+    msg.className = 'msg err show';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Adding...';
+
+  const res = await fetch('/api/dishes', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + token
+    },
+    body: JSON.stringify({
+      name,
+      desc: document.getElementById('desc').value.trim(),
+      price: Number(price),
+      category: document.getElementById('category').value,
+      veg: document.getElementById('veg').checked,
+      img: document.getElementById('img').value.trim() || undefined
+    })
+  });
+
+  btn.disabled = false;
+  btn.textContent = 'Add Dish to Menu';
+
+  if (!res.ok) {
+    const data = await res.json();
+    msg.textContent = data.error;
+    msg.className = 'msg err show';
+    return;
+  }
+
+  msg.textContent = name + ' added — it is now live on the customer menu.';
+  msg.className = 'msg ok show';
+  ['name','desc','price','img'].forEach(id => document.getElementById(id).value = '');
+  loadDishes();
+}
+
+async function deleteDish(id){
+  if (!confirm('Remove this dish from the menu?')) return;
+  await fetch('/api/dishes/' + id, {
+    method: 'DELETE',
+    headers: { 'Authorization': 'Bearer ' + token }
+  });
+  loadDishes();
+}
+</script>
+</body>
+</html>
